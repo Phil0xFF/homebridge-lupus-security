@@ -10,6 +10,12 @@
 
 This is a homebridge plugin for the Lupus Security XT2 alarm system.
 
+### Functions
+
+- See current status of the area 1 (home, armed, unarmed)
+- Set the alarm status of area 1 to home mode 1 or unarmed
+- Set the alarm status of area 1 to armed or unarmed
+
 ## Installation
 
 1. Install homebridge using the official instructions.
