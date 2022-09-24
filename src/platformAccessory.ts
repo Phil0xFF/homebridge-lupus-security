@@ -1,141 +1,206 @@
-import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
+import {
+  AccessoryConfig,
+  AccessoryPlugin,
+  API,
+  CharacteristicEventTypes,
+  CharacteristicGetCallback,
+  CharacteristicSetCallback,
+  CharacteristicValue,
+  HAP,
+  Logging,
+  Service
+} from 'homebridge';
+import { Lupus } from './lupus';
+import { readFile } from "fs/promises";
 
-import { ExampleHomebridgePlatform } from './platform';
+let hap: HAP;
+let lupus: any = null;
 
-/**
- * Platform Accessory
- * An instance of this class is created for each accessory your platform registers
- * Each accessory may expose multiple services of different service types.
+/*
+ * Initializer function called when the plugin is loaded.
  */
-export class ExamplePlatformAccessory {
-  private service: Service;
+export = async (api: API) => {
+  hap = api.hap;
 
-  /**
-   * These are just used to create a working example
-   * You should implement your own code to track the state of your accessory
-   */
-  private exampleStates = {
-    On: false,
-    Brightness: 100,
-  };
+  const configRaw = await readFile(api.user.configPath());
+  const config = JSON.parse(configRaw.toString());
 
-  constructor(
-    private readonly platform: ExampleHomebridgePlatform,
-    private readonly accessory: PlatformAccessory,
-  ) {
+  config.platforms.forEach((platform: any) => {
+    if (platform.platform === 'homebridge-lupus-security') {
+      console.log('Configuring Lupus Security platform...');
+      lupus = new Lupus(platform.lupusUrl, platform.lupusUsername, platform.lupusPassword);
+    }
+  });
 
-    // set accessory information
-    this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+  if(lupus) {
+    api.registerAccessory('Alarm Home', AlarmHome);
+    api.registerAccessory('Alarm Armed', AlarmArmed);
+  } else {
+    console.log('Lupus not configured, skipping alarm accessories.');
+  }
+};
 
-    // get the LightBulb service if it exists, otherwise create a new LightBulb service
-    // you can create multiple services for each accessory
-    this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
 
-    // set the service name, this is what is displayed as the default name on the Home app
-    // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.exampleDisplayName);
 
-    // each service must implement at-minimum the "required characteristics" for the given service type
-    // see https://developers.homebridge.io/#/service/Lightbulb
+class AlarmHome implements AccessoryPlugin {
+  private readonly log: Logging;
+  private readonly name: string;
+  private switchOn = false;
 
-    // register handlers for the On/Off Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.On)
-      .onSet(this.setOn.bind(this))                // SET - bind to the `setOn` method below
-      .onGet(this.getOn.bind(this));               // GET - bind to the `getOn` method below
+  private readonly switchService: Service;
+  private readonly informationService: Service;
 
-    // register handlers for the Brightness Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .onSet(this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
+  constructor(log: Logging, config: AccessoryConfig, api: API) {
+    this.log = log;
+    this.name = 'Alarm Home';
 
-    /**
-     * Creating multiple services of the same type.
-     *
-     * To avoid "Cannot add a Service with the same UUID another Service without also defining a unique 'subtype' property." error,
-     * when creating multiple services of the same type, you need to use the following syntax to specify a name and subtype id:
-     * this.accessory.getService('NAME') || this.accessory.addService(this.platform.Service.Lightbulb, 'NAME', 'USER_DEFINED_SUBTYPE_ID');
-     *
-     * The USER_DEFINED_SUBTYPE must be unique to the platform accessory (if you platform exposes multiple accessories, each accessory
-     * can use the same sub type id.)
-     */
+    // get current status of the home alarm
+    lupus.getStatus().then((status) => {
+      this.switchOn = status.home.armed;
+    });
 
-    // Example: add two "motion sensor" services to the accessory
-    const motionSensorOneService = this.accessory.getService('Motion Sensor One Name') ||
-      this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor One Name', 'YourUniqueIdentifier-1');
+    this.switchService = new hap.Service.Switch(this.name);
+    this.switchService.getCharacteristic(hap.Characteristic.On)
+      .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+        log.info("[Lupus] " + this.name + " is " + (this.switchOn? "ARM": "DISARM"));
+        callback(undefined, this.switchOn);
+      })
+      .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+        this.switchOn = value as boolean;
+        log.info("[Lupus] " + this.name + " set to " + (this.switchOn? "ARM": "DISARM"));
 
-    const motionSensorTwoService = this.accessory.getService('Motion Sensor Two Name') ||
-      this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor Two Name', 'YourUniqueIdentifier-2');
+        if(this.switchOn) {
+          lupus.setHome();
+        } else {
+          lupus.setDisarmed();
+        }
 
-    /**
-     * Updating characteristics values asynchronously.
-     *
-     * Example showing how to update the state of a Characteristic asynchronously instead
-     * of using the `on('get')` handlers.
-     * Here we change update the motion sensor trigger states on and off every 10 seconds
-     * the `updateCharacteristic` method.
-     *
-     */
-    let motionDetected = false;
-    setInterval(() => {
-      // EXAMPLE - inverse the trigger
-      motionDetected = !motionDetected;
+        callback();
+      });
 
-      // push the new value to HomeKit
-      motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
-      motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
+    this.informationService = new hap.Service.AccessoryInformation()
+      .setCharacteristic(hap.Characteristic.Manufacturer, "LUPUSEC")
+      .setCharacteristic(hap.Characteristic.Model, "XT2");
 
-      this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
-      this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-    }, 10000);
+    log.info("[Lupus] " + this.name + " initialized!");
+
+    this.getCurrentStatus();
+
   }
 
   /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
+   * Get the status of the alarm system.
+   * Run this function every 10 seconds to get the status of the alarm system.
    */
-  async setOn(value: CharacteristicValue) {
-    // implement your own code to turn your device on/off
-    this.exampleStates.On = value as boolean;
+  async getCurrentStatus(): Promise<void> {
+    setTimeout(async () => {
+      if(lupus) {
+        const status = await lupus.getStatus();
 
-    this.platform.log.debug('Set Characteristic On ->', value);
+        this.switchOn = status.home.armed;
+        this.switchService.getCharacteristic(hap.Characteristic.On).updateValue(this.switchOn);
+
+        console.log('[Lupus] ' + this.name + ' is ' + (this.switchOn? "HOME": "DISARM"));
+      }
+
+      this.getCurrentStatus();
+    }, 1000 * 60);
+  }
+
+  identify(): void {
+    // don't need to do anything here
+  }
+
+  getServices(): Service[] {
+    return [
+      this.informationService,
+      this.switchService,
+    ];
+  }
+}
+
+class AlarmArmed implements AccessoryPlugin {
+  private readonly log: Logging;
+  private readonly name: string;
+  private switchOn = false;
+
+  private readonly switchService: Service;
+  private readonly informationService: Service;
+
+  constructor(log: Logging, config: AccessoryConfig, api: API) {
+    this.log = log;
+    this.name = 'Alarm Armed';
+
+    // get current status of the home alarm
+    lupus.getStatus().then((status) => {
+      this.switchOn = status.alarm.armed;
+    });
+
+    this.switchService = new hap.Service.Switch(this.name);
+    this.switchService.getCharacteristic(hap.Characteristic.On)
+      .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+        log.info("[Lupus] " + this.name + " is " + (this.switchOn? "ARM": "DISARM"));
+        callback(undefined, this.switchOn);
+      })
+      .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
+        this.switchOn = value as boolean;
+        log.info("[Lupus] " + this.name + " set to " + (this.switchOn? "ARM": "DISARM"));
+
+        if(this.switchOn) {
+          lupus.setAlarmArm();
+          setTimeout(() => {
+            this.getCurrentStatusSingle();
+          }, 1000 * 2);
+        } else {
+          lupus.setDisarmed();
+        }
+
+        callback();
+      });
+
+    this.informationService = new hap.Service.AccessoryInformation()
+      .setCharacteristic(hap.Characteristic.Manufacturer, "LUPUSEC")
+      .setCharacteristic(hap.Characteristic.Model, "XT2");
+
+    log.info("[Lupus] " + this.name + " initialized!");
+
+    this.getCurrentStatus();
   }
 
   /**
-   * Handle the "GET" requests from HomeKit
-   * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
-   *
-   * GET requests should return as fast as possbile. A long delay here will result in
-   * HomeKit being unresponsive and a bad user experience in general.
-   *
-   * If your device takes time to respond you should update the status of your device
-   * asynchronously instead using the `updateCharacteristic` method instead.
-
-   * @example
-   * this.service.updateCharacteristic(this.platform.Characteristic.On, true)
+   * Get the status of the alarm system.
+   * Run this function every 10 seconds to get the status of the alarm system.
    */
-  async getOn(): Promise<CharacteristicValue> {
-    // implement your own code to check if the device is on
-    const isOn = this.exampleStates.On;
+  async getCurrentStatus(): Promise<void> {
+    setTimeout(async () => {
+      const status = await lupus.getStatus();
 
-    this.platform.log.debug('Get Characteristic On ->', isOn);
+      this.switchOn = status.alarm.armed;
+      this.switchService.getCharacteristic(hap.Characteristic.On).updateValue(this.switchOn);
 
-    // if you need to return an error to show the device as "Not Responding" in the Home app:
-    // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      console.log('[Lupus] ' + this.name + ' is ' + (this.switchOn? "ARMED": "DISARM"));
 
-    return isOn;
+      this.getCurrentStatus();
+    }, 1000 * 60);
   }
 
-  /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, changing the Brightness
-   */
-  async setBrightness(value: CharacteristicValue) {
-    // implement your own code to set the brightness
-    this.exampleStates.Brightness = value as number;
+  async getCurrentStatusSingle(): Promise<void> {
+    const status = await lupus.getStatus();
 
-    this.platform.log.debug('Set Characteristic Brightness -> ', value);
+    this.switchOn = status.alarm.armed;
+    this.switchService.getCharacteristic(hap.Characteristic.On).updateValue(this.switchOn);
+
+    console.log('[Lupus] ' + this.name + ' is ' + (this.switchOn? "ARMED": "DISARM"));
   }
 
+  identify(): void {
+    // don't need to do anything here
+  }
+
+  getServices(): Service[] {
+    return [
+      this.informationService,
+      this.switchService,
+    ];
+  }
 }
