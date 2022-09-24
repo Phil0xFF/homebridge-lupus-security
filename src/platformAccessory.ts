@@ -8,10 +8,10 @@ import {
   CharacteristicValue,
   HAP,
   Logging,
-  Service
+  Service,
 } from 'homebridge';
 import { Lupus } from './lupus';
-import { readFile } from "fs/promises";
+import { readFile } from 'fs/promises';
 
 let hap: HAP;
 let lupus: any = null;
@@ -27,7 +27,6 @@ export = async (api: API) => {
 
   config.platforms.forEach((platform: any) => {
     if (platform.platform === 'homebridge-lupus-security') {
-      console.log('Configuring Lupus Security platform...');
       lupus = new Lupus(platform.lupusUrl, platform.lupusUsername, platform.lupusPassword);
     }
   });
@@ -35,8 +34,6 @@ export = async (api: API) => {
   if(lupus) {
     api.registerAccessory('Alarm Home', AlarmHome);
     api.registerAccessory('Alarm Armed', AlarmArmed);
-  } else {
-    console.log('Lupus not configured, skipping alarm accessories.');
   }
 };
 
@@ -62,12 +59,12 @@ class AlarmHome implements AccessoryPlugin {
     this.switchService = new hap.Service.Switch(this.name);
     this.switchService.getCharacteristic(hap.Characteristic.On)
       .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-        log.info("[Lupus] " + this.name + " is " + (this.switchOn? "ARM": "DISARM"));
+        log.info('[Lupus] ' + this.name + ' is ' + (this.switchOn? 'ARM': 'DISARM'));
         callback(undefined, this.switchOn);
       })
       .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
         this.switchOn = value as boolean;
-        log.info("[Lupus] " + this.name + " set to " + (this.switchOn? "ARM": "DISARM"));
+        log.info('[Lupus] ' + this.name + ' set to ' + (this.switchOn? 'ARM': 'DISARM'));
 
         if(this.switchOn) {
           lupus.setHome();
@@ -79,10 +76,10 @@ class AlarmHome implements AccessoryPlugin {
       });
 
     this.informationService = new hap.Service.AccessoryInformation()
-      .setCharacteristic(hap.Characteristic.Manufacturer, "LUPUSEC")
-      .setCharacteristic(hap.Characteristic.Model, "XT2");
+      .setCharacteristic(hap.Characteristic.Manufacturer, 'LUPUSEC')
+      .setCharacteristic(hap.Characteristic.Model, 'XT2');
 
-    log.info("[Lupus] " + this.name + " initialized!");
+    log.info('[Lupus] ' + this.name + ' initialized!');
 
     this.getCurrentStatus();
 
@@ -99,8 +96,6 @@ class AlarmHome implements AccessoryPlugin {
 
         this.switchOn = status.home.armed;
         this.switchService.getCharacteristic(hap.Characteristic.On).updateValue(this.switchOn);
-
-        console.log('[Lupus] ' + this.name + ' is ' + (this.switchOn? "HOME": "DISARM"));
       }
 
       this.getCurrentStatus();
@@ -139,12 +134,12 @@ class AlarmArmed implements AccessoryPlugin {
     this.switchService = new hap.Service.Switch(this.name);
     this.switchService.getCharacteristic(hap.Characteristic.On)
       .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-        log.info("[Lupus] " + this.name + " is " + (this.switchOn? "ARM": "DISARM"));
+        log.info('[Lupus] ' + this.name + ' is ' + (this.switchOn? 'ARM': 'DISARM'));
         callback(undefined, this.switchOn);
       })
       .on(CharacteristicEventTypes.SET, (value: CharacteristicValue, callback: CharacteristicSetCallback) => {
         this.switchOn = value as boolean;
-        log.info("[Lupus] " + this.name + " set to " + (this.switchOn? "ARM": "DISARM"));
+        log.info('[Lupus] ' + this.name + ' set to ' + (this.switchOn? 'ARM': 'DISARM'));
 
         if(this.switchOn) {
           lupus.setAlarmArm();
@@ -159,10 +154,10 @@ class AlarmArmed implements AccessoryPlugin {
       });
 
     this.informationService = new hap.Service.AccessoryInformation()
-      .setCharacteristic(hap.Characteristic.Manufacturer, "LUPUSEC")
-      .setCharacteristic(hap.Characteristic.Model, "XT2");
+      .setCharacteristic(hap.Characteristic.Manufacturer, 'LUPUSEC')
+      .setCharacteristic(hap.Characteristic.Model, 'XT2');
 
-    log.info("[Lupus] " + this.name + " initialized!");
+    log.info('[Lupus] ' + this.name + ' initialized!');
 
     this.getCurrentStatus();
   }
@@ -178,8 +173,6 @@ class AlarmArmed implements AccessoryPlugin {
       this.switchOn = status.alarm.armed;
       this.switchService.getCharacteristic(hap.Characteristic.On).updateValue(this.switchOn);
 
-      console.log('[Lupus] ' + this.name + ' is ' + (this.switchOn? "ARMED": "DISARM"));
-
       this.getCurrentStatus();
     }, 1000 * 60);
   }
@@ -189,8 +182,6 @@ class AlarmArmed implements AccessoryPlugin {
 
     this.switchOn = status.alarm.armed;
     this.switchService.getCharacteristic(hap.Characteristic.On).updateValue(this.switchOn);
-
-    console.log('[Lupus] ' + this.name + ' is ' + (this.switchOn? "ARMED": "DISARM"));
   }
 
   identify(): void {
