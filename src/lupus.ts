@@ -142,15 +142,15 @@ export class Lupus {
 
     let s = response.data;
 
-    s = s.replace(/\\n/g, "\\n")
-      .replace(/\\'/g, "\\'")
+    s = s.replace(/\\n/g, '\\n')
+      .replace(/\\'/g, '\\\'')
       .replace(/\\"/g, '\\"')
-      .replace(/\\&/g, "\\&")
-      .replace(/\\r/g, "\\r")
-      .replace(/\\t/g, "\\t")
-      .replace(/\\b/g, "\\b")
-      .replace(/\\f/g, "\\f");
-// Remove non-printable and other non-valid JSON characters
+      .replace(/\\&/g, '\\&')
+      .replace(/\\r/g, '\\r')
+      .replace(/\\t/g, '\\t')
+      .replace(/\\b/g, '\\b')
+      .replace(/\\f/g, '\\f');
+    // Remove non-printable and other non-valid JSON characters
     // eslint-disable-next-line no-control-regex
     s = s.replace(/[\u0000-\u0019]+/g, '');
     const o = JSON.parse(s);
