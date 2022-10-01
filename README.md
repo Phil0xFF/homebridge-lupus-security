@@ -55,4 +55,4 @@ You can change the status of the alarm system by clicking on the "Alarm" tile. Y
 - If you got other errors, please open an issue on GitHub.
 
 ~~The plugin code is still very messy, but it works if everything is configured correctly. I will clean it up in the future.~~
-<br>The plugin code now is very clean. :)
+<br>The plugin code now is very clean. :-)
