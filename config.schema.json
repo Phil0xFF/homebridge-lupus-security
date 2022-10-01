@@ -1,0 +1,28 @@
+{
+  "pluginAlias": "HomebridgeLupusSecurity",
+  "pluginType": "platform",
+  "singular": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "lupusUrl": {
+        "title": "Name",
+        "type": "string",
+        "required": true,
+        "default": "http://127.0.0.1"
+      },
+      "lupusUsername": {
+        "title": "Name",
+        "type": "string",
+        "required": true,
+        "default": "admin"
+      },
+      "lupusPassword": {
+        "title": "Name",
+        "type": "string",
+        "required": true,
+        "default": "password"
+      }
+    }
+  }
+}
