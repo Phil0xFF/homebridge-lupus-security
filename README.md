@@ -22,7 +22,7 @@ This is a homebridge plugin for the Lupus Security XT2 alarm system. _Example pi
 2. Search for "homebridge-lupus-security" in the homebridge UI or install this plugin using: `npm install -g homebridge-lupus-security`.
 
 #### Upgrade from 1.0.0 to 2.0.0
-1. Upgrade the plugin via homebridge UI or `npm install -g homebridge-lupus-security`.
+1. Upgrade the plugin via homebridge UI or `npm install -g homebridge-lupus-security@latest`.
 2. Remove the old accessory and other config values from the homebridge config.json or via the homebridge UI.
 3. Set the new config values via the homebridge UI or add the new config values to the config.json.
 
