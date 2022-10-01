@@ -9,6 +9,13 @@ export interface LupusStatus {
     };
 }
 
+export interface LupusDevice {
+  area: number;
+  zone: number;
+  name: string;
+  status_ex: number;
+}
+
 /**
  * Lupus Class for handling HTTP calls to the lupusec xt2 alarm system.
  * - status of the alarm system
@@ -118,5 +125,36 @@ export class Lupus {
         'X-Token': xtoken,
       },
     });
+  }
+
+  /**
+   * Get the list of devices.
+   * status_ex = 0 = closed
+   * status_ex = 1 = open
+   */
+  async getDeviceList(): Promise<LupusDevice[]> {
+    const response = await axios.get(this.url + '/action/deviceListGet', {
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(this.username + ':' + this.password).toString('base64'),
+        'Content-Type': 'application/json',
+      },
+    });
+
+    let s = response.data;
+
+    s = s.replace(/\\n/g, "\\n")
+      .replace(/\\'/g, "\\'")
+      .replace(/\\"/g, '\\"')
+      .replace(/\\&/g, "\\&")
+      .replace(/\\r/g, "\\r")
+      .replace(/\\t/g, "\\t")
+      .replace(/\\b/g, "\\b")
+      .replace(/\\f/g, "\\f");
+// Remove non-printable and other non-valid JSON characters
+    // eslint-disable-next-line no-control-regex
+    s = s.replace(/[\u0000-\u0019]+/g, '');
+    const o = JSON.parse(s);
+
+    return o.senrows;
   }
 }
